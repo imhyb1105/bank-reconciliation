@@ -1,0 +1,1521 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>银行对账工具</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f6f3f0;
+    --card-bg: #fefcf9;
+    --border: #e8e4e0;
+    --border-hover: #d4cfc9;
+    --text: #2c2a27;
+    --text-secondary: #6b6560;
+    --text-muted: #9e9790;
+    --accent: #1a3a5c;
+    --accent-hover: #244e78;
+    --accent-light: #eef3f8;
+    --green: #3d6b4f;
+    --green-bg: #eef6f0;
+    --amber: #8b6914;
+    --amber-bg: #fdf7ec;
+    --red: #9b3c3c;
+    --red-bg: #fdf4f4;
+    --shadow: 0 1px 3px rgba(44,42,39,0.06), 0 1px 2px rgba(44,42,39,0.04);
+    --radius-sm: 6px;
+    --radius: 10px;
+    --radius-lg: 14px;
+    --font: 'Outfit', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: var(--font);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .container { max-width: 1200px; margin: 0 auto; padding: 16px 20px 40px; }
+
+  /* Header */
+  .header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+  .header h1 { font-size: 1.4rem; font-weight: 700; color: var(--text); letter-spacing: -0.02em; }
+  .header-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .period-select { display: flex; align-items: center; gap: 6px; font-size: 0.875rem; color: var(--text-secondary); }
+  .period-select select {
+    font-family: var(--font); font-size: 0.875rem; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--card-bg); color: var(--text); cursor: pointer;
+  }
+  .period-hint { font-size: 0.75rem; color: var(--text-muted); }
+
+  /* Security banner */
+  .security-banner {
+    display: flex; align-items: flex-start; gap: 8px; padding: 10px 14px;
+    background: var(--green-bg); border: 1px solid #d4e4d8;
+    border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--green);
+    margin-bottom: 12px; line-height: 1.5;
+  }
+  .security-banner .lock { font-size: 1rem; flex-shrink: 0; margin-top: 1px; }
+
+  /* Warning banner (parse errors) */
+  .warning-banner {
+    display: none; align-items: flex-start; gap: 8px; padding: 10px 14px;
+    background: var(--amber-bg); border: 1px solid #e0d4b4;
+    border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--amber);
+    margin-bottom: 16px; line-height: 1.5; cursor: pointer;
+  }
+  .warning-banner.show { display: flex; }
+  .warning-banner summary { font-weight: 600; cursor: pointer; }
+  .warning-banner ul { margin: 4px 0 0 16px; font-weight: 400; }
+  .warning-banner li { margin-top: 2px; }
+
+  /* Data source area */
+  .data-sources { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .source-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px;
+    box-shadow: var(--shadow); transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .source-card:hover { border-color: var(--border-hover); box-shadow: 0 2px 8px rgba(44,42,39,0.08); }
+  .source-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  .source-card h3 .count { font-weight: 400; color: var(--text-muted); font-size: 0.8rem; }
+  .input-divider {
+    display: flex; align-items: center; gap: 10px; margin: 10px 0;
+    font-size: 0.78rem; color: var(--text-muted); user-select: none;
+  }
+  .input-divider::before, .input-divider::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+  .paste-area {
+    width: 100%; min-height: 120px; padding: 12px;
+    border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+    font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    font-size: 0.8rem; line-height: 1.5; resize: vertical;
+    background: #fdfdfc; color: var(--text);
+    transition: border-color 0.2s; outline: none;
+  }
+  .paste-area:focus { border-color: var(--accent); border-style: solid; }
+  .paste-area::placeholder { color: var(--text-muted); }
+  .file-upload { display: none; }
+  .file-upload-area {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 100px; border: 1.5px dashed var(--border); border-radius: var(--radius-sm);
+    cursor: pointer; color: var(--text-secondary); font-size: 0.85rem;
+    transition: all 0.2s; background: #fdfdfc;
+  }
+  .file-upload-area:hover { border-color: var(--accent); color: var(--accent); }
+  .file-upload-area.drag-over { border-color: var(--accent); background: var(--accent-light); border-style: solid; transform: scale(1.01); }
+  .file-upload-area.has-file { border-color: var(--green); border-style: solid; background: var(--green-bg); color: var(--green); }
+  .file-upload-area.has-file .upload-icon { font-size: 1.2rem; }
+  .file-info { font-size: 0.75rem; color: var(--green); margin-top: 6px; display: none; }
+  .file-info.show { display: block; }
+
+  /* Column mapping */
+  .col-mapping { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .col-mapping label { font-size: 0.75rem; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
+  .col-mapping select {
+    font-family: var(--font); font-size: 0.8rem; padding: 4px 8px;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--card-bg); color: var(--text);
+  }
+  .amount-sign-toggle { display: flex; align-items: center; gap: 4px; font-size: 0.75rem; color: var(--text-secondary); }
+  .amount-sign-toggle input { margin: 0; }
+  .mapping-hint { display: block; width: 100%; font-size: 0.72rem; color: var(--amber); background: var(--amber-bg); padding: 4px 8px; border-radius: 4px; }
+  .mapping-hint[hidden] { display: none; }
+  .dual-amount-row { display: none; gap: 8px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+  .dual-amount-row.show { display: flex; }
+
+  /* Actions */
+  .actions { display: flex; justify-content: center; gap: 12px; margin-bottom: 24px; }
+  .btn {
+    font-family: var(--font); font-size: 0.9rem; font-weight: 600; padding: 10px 28px;
+    border: none; border-radius: 22px; cursor: pointer; transition: all 0.2s;
+    letter-spacing: 0.01em;
+  }
+  .btn:active { transform: scale(0.98); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); }
+  .btn-secondary { background: var(--card-bg); color: var(--text-secondary); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Statistics */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stat-card {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+    box-shadow: var(--shadow); text-align: center;
+  }
+  .stat-card .stat-value { font-size: 1.8rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .stat-card .stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 4px; }
+  .stat-card.total .stat-value { color: var(--text); }
+  .stat-card.matched .stat-value { color: var(--green); }
+  .stat-card.bank-only .stat-value { color: var(--amber); }
+  .stat-card.acct-only .stat-value { color: var(--red); }
+
+  /* Export */
+  .export-bar { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 16px; }
+  .export-btn {
+    font-family: var(--font); font-size: 0.78rem; padding: 6px 14px;
+    border: 1px solid var(--border); border-radius: 20px;
+    background: var(--card-bg); color: var(--text-secondary);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .export-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* Results */
+  .results { display: flex; flex-direction: column; gap: 10px; }
+  .result-group { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .result-group-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; cursor: pointer; user-select: none;
+    transition: background 0.15s; font-weight: 600; font-size: 0.9rem;
+  }
+  .result-group-header:hover { background: rgba(0,0,0,0.02); }
+  .result-group-header .badge {
+    font-size: 0.75rem; font-weight: 500; padding: 2px 10px; border-radius: 12px;
+  }
+  .result-group-body { display: none; border-top: 1px solid var(--border); }
+  .result-group.open .result-group-body { display: block; }
+  .result-group-header .arrow { transition: transform 0.2s; color: var(--text-muted); font-size: 0.7rem; }
+  .result-group.open .arrow { transform: rotate(180deg); }
+  .result-group.bank-only .badge { background: var(--amber-bg); color: var(--amber); }
+  .result-group.acct-only .badge { background: var(--red-bg); color: var(--red); }
+  .result-group.candidates .badge { background: var(--accent-light); color: var(--accent); }
+  .result-group.matched .badge { background: var(--green-bg); color: var(--green); }
+
+  .result-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .result-table th { text-align: left; padding: 8px 18px; font-size: 0.72rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 1px solid var(--border); background: #fdfdfc; }
+  .result-table td { padding: 9px 18px; border-bottom: 1px solid #f3f1ee; vertical-align: top; }
+  .result-table tr:hover td { background: rgba(0,0,0,0.01); }
+  .result-table .tag { display: inline-block; font-size: 0.68rem; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-left: 6px; }
+  .tag.close { background: var(--amber-bg); color: var(--amber); }
+  .tag.duplicate { background: var(--accent-light); color: var(--accent); }
+  .amount-cell { font-variant-numeric: tabular-nums; text-align: right; font-weight: 500; }
+  .diff-match { background: var(--green-bg); padding: 2px 8px; border-radius: 10px; font-size: 0.72rem; color: var(--green); font-weight: 500; }
+
+  /* Candidates section */
+  .candidate-hint { padding: 14px 18px; font-size: 0.82rem; border-bottom: 1px solid var(--border); }
+  .candidate-hint:last-child { border-bottom: none; }
+  .candidate-hint .pair { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .candidate-hint .vs { color: var(--text-muted); font-size: 0.75rem; }
+  .candidate-hint .item { background: #faf8f6; padding: 6px 12px; border-radius: var(--radius-sm); font-size: 0.8rem; border: 1px solid var(--border); }
+
+  /* Footer hint */
+  .hint-bar { margin-top: 20px; padding: 12px 18px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.8rem; color: var(--text-secondary); text-align: center; }
+
+  /* Empty state */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--text); color: #fff; padding: 10px 24px; border-radius: 20px; font-size: 0.82rem; opacity: 0; transition: opacity 0.3s; pointer-events: none; z-index: 100; }
+  .toast.show { opacity: 1; }
+
+  /* xlsx fallback */
+  .xlsx-fallback { display: none; font-size: 0.75rem; color: var(--text-muted); margin-top: 8px; }
+  .xlsx-fallback.show { display: block; }
+
+  /* Mobile */
+  @media (max-width: 768px) {
+    .container { padding: 12px 14px 32px; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .data-sources { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .col-mapping { flex-direction: column; align-items: flex-start; }
+    .btn { padding: 10px 22px; font-size: 0.85rem; }
+    .result-table { font-size: 0.75rem; }
+    .result-table th, .result-table td { padding: 7px 10px; }
+  }
+  @media (max-width: 375px) {
+    .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+    .stat-card { padding: 12px 10px; }
+    .stat-card .stat-value { font-size: 1.4rem; }
+  }
+
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header class="header">
+    <h1>银行对账</h1>
+    <div class="header-right">
+      <div class="period-select">
+        <label for="period-year">对账期间</label>
+        <select id="period-year"></select>
+        <span>年</span>
+        <select id="period-month"></select>
+        <span>月</span>
+        <span class="period-hint" id="period-hint">无年份日期将基于此期间推断</span>
+      </div>
+    </div>
+  </header>
+
+  <div class="security-banner">
+    <span class="lock">&#x1f512;</span>
+    <div>账务数据不上传、不存储至服务器，仅在您的浏览器内处理，关闭页面后即消失。界面字体和 Excel 解析组件通过外部 CDN 加载（非账务数据）。列映射偏好保存在本地浏览器中。</div>
+  </div>
+
+  <div class="warning-banner" id="warning-banner">
+    <span>&#x26a0;</span>
+    <div>
+      <div id="warning-summary"></div>
+      <ul id="warning-list" style="display:none"></ul>
+    </div>
+  </div>
+
+  <div class="data-sources">
+    <!-- 银行流水 -->
+    <div class="source-card" id="bank-card">
+      <h3>银行流水 <span class="count" id="bank-count"></span></h3>
+      <textarea class="paste-area" id="bank-paste" placeholder="从 Excel 复制数据后在此粘贴&#10;格式：日期 &#8594; 摘要 &#8594; 金额（Tab 或逗号分隔）"></textarea>
+      <div class="input-divider">或</div>
+      <label class="file-upload-area" id="bank-file-upload" for="bank-file-input">
+        <span class="upload-icon">&#x1f4c1;</span>
+        <span class="upload-text">点击选择文件，或拖拽 CSV/Excel 文件到此处</span>
+      </label>
+      <input type="file" class="file-upload" id="bank-file-input" accept=".csv,.txt,.xlsx,.xls">
+      <div class="file-info" id="bank-file-info"></div>
+      <div class="xlsx-fallback" id="bank-xlsx-fallback">&#x26a0; Excel 组件加载失败，请使用粘贴或 CSV 方式</div>
+      <div class="col-mapping">
+        <span class="mapping-hint" id="bank-mapping-hint" hidden>&#x26a0; 已应用上次列映射，请确认列对应关系</span>
+        <label>日期列 <select id="bank-date-col"></select></label>
+        <label>摘要列 <select id="bank-desc-col"></select></label>
+        <label id="bank-amount-label">金额列 <select id="bank-amount-col"></select></label>
+        <label class="amount-sign-toggle"><input type="checkbox" id="bank-dual-amount"> 借贷分列（借方+贷方）</label>
+        <label class="amount-sign-toggle"><input type="checkbox" id="bank-sign-flip"> 金额取反</label>
+      </div>
+      <div class="dual-amount-row" id="bank-dual-row">
+        <label>借方金额(收入) <select id="bank-debit-col"></select></label>
+        <label>贷方金额(支出) <select id="bank-credit-col"></select></label>
+      </div>
+    </div>
+
+    <!-- 账务明细 -->
+    <div class="source-card" id="acct-card">
+      <h3>账务明细 <span class="count" id="acct-count"></span></h3>
+      <textarea class="paste-area" id="acct-paste" placeholder="从 Excel 复制数据后在此粘贴&#10;格式：日期 &#8594; 摘要 &#8594; 金额（Tab 或逗号分隔）"></textarea>
+      <div class="input-divider">或</div>
+      <label class="file-upload-area" id="acct-file-upload" for="acct-file-input">
+        <span class="upload-icon">&#x1f4c1;</span>
+        <span class="upload-text">点击选择文件，或拖拽 CSV/Excel 文件到此处</span>
+      </label>
+      <input type="file" class="file-upload" id="acct-file-input" accept=".csv,.txt,.xlsx,.xls">
+      <div class="file-info" id="acct-file-info"></div>
+      <div class="xlsx-fallback" id="acct-xlsx-fallback">&#x26a0; Excel 组件加载失败，请使用粘贴或 CSV 方式</div>
+      <div class="col-mapping">
+        <span class="mapping-hint" id="acct-mapping-hint" hidden>&#x26a0; 已应用上次列映射，请确认列对应关系</span>
+        <label>日期列 <select id="acct-date-col"></select></label>
+        <label>摘要列 <select id="acct-desc-col"></select></label>
+        <label id="acct-amount-label">金额列 <select id="acct-amount-col"></select></label>
+        <label class="amount-sign-toggle"><input type="checkbox" id="acct-dual-amount"> 借贷分列（借方+贷方）</label>
+        <label class="amount-sign-toggle"><input type="checkbox" id="acct-sign-flip"> 金额取反</label>
+      </div>
+      <div class="dual-amount-row" id="acct-dual-row">
+        <label>借方金额(收入) <select id="acct-debit-col"></select></label>
+        <label>贷方金额(支出) <select id="acct-credit-col"></select></label>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-reconcile">开始对账</button>
+    <button class="btn btn-secondary" id="btn-reset">重置</button>
+  </div>
+
+  <div id="results-area" hidden>
+    <div class="stats" id="stats-panel"></div>
+    <div class="export-bar" id="export-bar" hidden>
+      <button class="export-btn" id="btn-export-tsv">&#x1f4cb; 复制为 TSV（粘贴到 Excel）</button>
+      <button class="export-btn" id="btn-export-csv">&#x2b07; 下载 CSV</button>
+    </div>
+    <div class="results" id="results-list"></div>
+    <div class="hint-bar">&#x1f4a1; 导出后粘贴到 Excel 即可继续标注差异原因并留痕</div>
+  </div>
+
+  <div class="empty-state" id="empty-state">
+    <div class="icon">&#x1f4ca;</div>
+    <p>粘贴或上传银行流水和账务明细，点击"开始对账"即可自动匹配差异</p>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ============================================================
+// 匹配引擎 & 数据处理
+// ============================================================
+
+function parseAmount(raw) {
+  if (raw == null) return NaN;
+  let s = String(raw).trim();
+  if (s === '' || s === '—' || s === '-') return NaN;
+  s = s.replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  const parenMatch = s.match(/^\((.+)\)$/);
+  if (parenMatch) s = '-' + parenMatch[1];
+  s = s.replace(/^[－﹣]/, '-');
+  s = s.replace(/[¥￥$€£\s]/g, '');
+  if (s.includes('.') || s.includes(',')) {
+    if (s.includes(',') && s.includes('.')) { s = s.replace(/,/g, ''); }
+    else if (s.includes(',') && !s.includes('.')) {
+      const parts = s.split(',');
+      if (parts.length === 2 && parts[1].length <= 2) { s = parts[0] + '.' + parts[1]; }
+      else { s = s.replace(/,/g, ''); }
+    }
+  }
+  const n = parseFloat(s);
+  return isNaN(n) ? NaN : Math.round(n * 100) / 100;
+}
+
+function isValidDate(dateStr) {
+  if (!dateStr) return false;
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return false;
+  const parts = dateStr.split('-');
+  if (parts.length !== 3) return false;
+  return d.getFullYear() === parseInt(parts[0]) &&
+         d.getMonth() + 1 === parseInt(parts[1]) &&
+         d.getDate() === parseInt(parts[2]);
+}
+
+function parseDate(raw, periodYear, periodMonth) {
+  let s = String(raw).trim();
+  s = s.replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  let result = null;
+  const cnMatch = s.match(/(\d{1,4})年(\d{1,2})月(\d{1,2})日?/);
+  if (cnMatch) result = `${String(cnMatch[1]).padStart(4,'0')}-${String(cnMatch[2]).padStart(2,'0')}-${String(cnMatch[3]).padStart(2,'0')}`;
+  if (!result) {
+    const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+    const enMatch = s.match(/(\d{1,2})-([A-Za-z]{3})-(\d{2,4})/);
+    if (enMatch) {
+      const m = months[enMatch[2].toLowerCase()];
+      if (m) result = `${String(enMatch[3]).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(enMatch[1]).padStart(2,'0')}`;
+    }
+  }
+  if (!result) {
+    const numMatch = s.match(/^(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})$/);
+    if (numMatch) {
+      let y = parseInt(numMatch[1]);
+      if (y < 100) y += 2000;
+      result = `${String(y).padStart(4,'0')}-${String(numMatch[2]).padStart(2,'0')}-${String(numMatch[3]).padStart(2,'0')}`;
+    }
+  }
+  if (!result) {
+    const shortMatch = s.match(/^(\d{1,2})[\/\-.](\d{1,2})$/);
+    if (shortMatch) {
+      let y = periodYear;
+      const m = parseInt(shortMatch[1]);
+      if (m >= 10 && m <= 12 && periodMonth <= 2) y = periodYear - 1;
+      result = `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(shortMatch[2]).padStart(2,'0')}`;
+    }
+  }
+  if (!result) {
+    const cnShort = s.match(/(\d{1,2})月(\d{1,2})日?/);
+    if (cnShort) {
+      let y = periodYear;
+      const m = parseInt(cnShort[1]);
+      if (m >= 10 && m <= 12 && periodMonth <= 2) y = periodYear - 1;
+      result = `${String(y).padStart(4,'0')}-${String(m).padStart(2,'0')}-${String(cnShort[2]).padStart(2,'0')}`;
+    }
+  }
+  if (!result) {
+    const compact = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+    if (compact) result = `${compact[1]}-${compact[2]}-${compact[3]}`;
+  }
+  if (result && !isValidDate(result)) return null;
+  return result;
+}
+
+function dateDiff(d1, d2) {
+  const a = new Date(d1 + 'T00:00:00'), b = new Date(d2 + 'T00:00:00');
+  return Math.abs((a - b) / (1000 * 60 * 60 * 24));
+}
+
+function cleanDesc(desc) {
+  let s = String(desc).trim();
+  s = s.replace(/[\uFF01-\uFF5E]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  s = s.replace(/\b\d{6,}\b/g, '');
+  s = s.replace(/尾号\s*\d{4}/g, '');
+  s = s.replace(/卡号末四位\s*\d{4}/g, '');
+  s = s.replace(/网银|手机银行|ATM|柜面|银联|快捷支付|批量代扣|集中代收/g, '');
+  s = s.replace(/中国工商银行|招商银行|建设银行|中国建设银行|农业银行|中国农业银行|中国银行|交通银行|浦发银行|浦发|中信银行|中信|光大银行|光大|民生银行|民生|兴业银行|兴业|平安银行|平安|广发银行|广发/g, '');
+  s = s.replace(/[（(][^）)]*[）)]/g, '');
+  s = s.replace(/\s+/g, ' ').trim();
+  return s;
+}
+
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const dp = Array.from({length: m + 1}, (_, i) => [i]);
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+
+function levenshteinRatio(a, b) {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const maxLen = Math.max(a.length, b.length);
+  return 1 - levenshtein(a, b) / maxLen;
+}
+
+// ============================================================
+// CSV & Paste Parsing
+// ============================================================
+
+function parseCSV(text) {
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+    if (inQuotes) {
+      if (ch === '"' && next === '"') { field += '"'; i++; }
+      else if (ch === '"') { inQuotes = false; }
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(field.trim()); field = ''; }
+      else if (ch === '\n') { row.push(field.trim()); if (row.some(f => f)) rows.push(row); row = []; field = ''; }
+      else if (ch === '\r') { /* skip */ }
+      else { field += ch; }
+    }
+  }
+  row.push(field.trim());
+  if (row.some(f => f)) rows.push(row);
+  return rows;
+}
+
+function detectDelimiter(text) {
+  const lines = text.split('\n').filter(l => l.trim());
+  if (lines.length === 0) return '\t';
+  const firstFew = lines.slice(0, Math.min(3, lines.length));
+  let tabs = 0, commas = 0;
+  for (const line of firstFew) {
+    tabs += (line.match(/\t/g) || []).length;
+    commas += (line.match(/,/g) || []).length;
+  }
+  if (tabs === 0 && commas === 0) return '\t';
+  return tabs >= commas ? '\t' : ',';
+}
+
+function parsePaste(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const delim = detectDelimiter(text);
+  const rows = [];
+  for (const line of text.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (delim === ',') {
+      const fields = [];
+      let field = '';
+      let inQ = false;
+      for (let i = 0; i < trimmed.length; i++) {
+        const ch = trimmed[i], next = trimmed[i+1];
+        if (inQ) {
+          if (ch === '"' && next === '"') { field += '"'; i++; }
+          else if (ch === '"') { inQ = false; }
+          else { field += ch; }
+        } else {
+          if (ch === '"') { inQ = true; }
+          else if (ch === ',') { fields.push(field.trim()); field = ''; }
+          else { field += ch; }
+        }
+      }
+      fields.push(field.trim());
+      if (fields.some(f => f)) rows.push(fields);
+    } else {
+      const fields = trimmed.split(delim).map(f => f.trim());
+      if (fields.some(f => f)) rows.push(fields);
+    }
+  }
+  return rows;
+}
+
+// ============================================================
+// Data Processing
+// ============================================================
+
+function detectColumns(rows) {
+  if (rows.length === 0) return { dateCol: 0, descCol: 1, amountCol: 2 };
+  const headers = rows[0].map(h => String(h).toLowerCase());
+  let dateCol = 0, descCol = 1, amountCol = 2;
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    if (/日期|date|时间|time|交易日期/.test(h)) dateCol = i;
+    if (/摘要|描述|说明|desc|用途|备注|交易名称|对方/.test(h)) descCol = i;
+    if (/金额|收入|支出|amount|发生额|交易金额/.test(h) && !/余额|balance/.test(h)) amountCol = i;
+  }
+  return { dateCol, descCol, amountCol };
+}
+
+// Detect dual columns: 借方/贷方 or 收入/支出
+function detectDualColumns(rows) {
+  if (rows.length === 0) return { debitCol: 1, creditCol: 2 };
+  const headers = rows[0].map(h => String(h).toLowerCase());
+  let debitCol = -1, creditCol = -1;
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    if (/借方|debit|收入/.test(h) && !/余额|balance/.test(h)) debitCol = i;
+    if (/贷方|credit|支出/.test(h) && !/余额|balance/.test(h)) creditCol = i;
+  }
+  return { debitCol, creditCol };
+}
+
+function isHeaderRow(rows) {
+  if (rows.length === 0) return false;
+  // Check if first row looks like a header (can't parse date or amount)
+  const detected = detectColumns(rows);
+  const firstRow = rows[0];
+  if (firstRow.length <= detected.dateCol || firstRow.length <= detected.amountCol) return false;
+  const dateStr = String(firstRow[detected.dateCol]).trim();
+  const amtStr = String(firstRow[detected.amountCol]).trim();
+  // If date field can be parsed AND amount can be parsed → likely data row, not header
+  if (parseDate(dateStr, 2026, 6) && !isNaN(parseAmount(amtStr))) return false;
+  return true;
+}
+
+function normalizeRecords(rows, mapping, periodYear, periodMonth, signFlip, source) {
+  const records = [];
+  const errors = [];
+  const dualMode = mapping.dualAmount && mapping.debitCol >= 0 && mapping.creditCol >= 0;
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const maxCol = dualMode
+      ? Math.max(mapping.dateCol, mapping.descCol, mapping.debitCol, mapping.creditCol)
+      : Math.max(mapping.dateCol, mapping.descCol, mapping.amountCol);
+    if (row.length <= maxCol) continue;
+    const rawDate = row[mapping.dateCol];
+    const rawDesc = row[mapping.descCol];
+    const date = parseDate(rawDate, periodYear, periodMonth);
+    if (date == null) { errors.push({ row: i + 1, field: '日期', value: rawDate }); continue; }
+    const desc = String(rawDesc).trim();
+    if (!desc) { errors.push({ row: i + 1, field: '摘要', value: '(空)' }); continue; }
+    let amount;
+    if (dualMode) {
+      const debitAmt = parseAmount(row[mapping.debitCol]);
+      const creditAmt = parseAmount(row[mapping.creditCol]);
+      if (isNaN(debitAmt) && isNaN(creditAmt)) {
+        errors.push({ row: i + 1, field: '借方/贷方金额', value: `${row[mapping.debitCol]} / ${row[mapping.creditCol]}` }); continue;
+      }
+      amount = (isNaN(debitAmt) ? 0 : debitAmt) - (isNaN(creditAmt) ? 0 : creditAmt);
+    } else {
+      const rawAmount = row[mapping.amountCol];
+      amount = parseAmount(rawAmount);
+      if (isNaN(amount)) { errors.push({ row: i + 1, field: '金额', value: rawAmount }); continue; }
+      if (signFlip) amount = -amount;
+    }
+    records.push({
+      id: records.length,
+      date,
+      desc,
+      descClean: cleanDesc(desc),
+      amount: amount,
+      source: source,
+      raw: {...row}
+    });
+  }
+  return { records, errors };
+}
+
+function updateColumnSelects(source, rows) {
+  const saved = loadMapping(source);
+  const detected = detectColumns(rows);
+  const dualDetected = detectDualColumns(rows);
+
+  const dateSelect = document.getElementById(`${source}-date-col`);
+  const descSelect = document.getElementById(`${source}-desc-col`);
+  const amountSelect = document.getElementById(`${source}-amount-col`);
+  const debitSelect = document.getElementById(`${source}-debit-col`);
+  const creditSelect = document.getElementById(`${source}-credit-col`);
+
+  const firstRow = rows[0] || [];
+  const hasHeader = isHeaderRow(rows);
+
+  // Validate saved header fingerprint — different template → ignore saved
+  const currentHdrs = firstRow.map(h => String(h || '').substring(0, 30));
+  let headersMatch = false;
+  if (saved && saved._h && saved._h.length === currentHdrs.length) {
+    headersMatch = saved._h.every((h, i) => h === currentHdrs[i]);
+  }
+  // Backward compat: saved from older version without _h fingerprint → accept once
+  // (next persistMapping will add _h, so future loads get full protection)
+  const hasLegacySaved = saved && !saved._h;
+  // effectiveSaved: only trust saved values when header fingerprint matches
+  const effectiveSaved = (saved && (headersMatch || hasLegacySaved)) ? saved : null;
+  const mapping = effectiveSaved || detected;
+
+  // Show/hide mapping hint based on whether saved mapping was applied
+  const hintEl = document.getElementById(`${source}-mapping-hint`);
+  if (hintEl) hintEl.hidden = !effectiveSaved;
+
+  // Validate saved column indices are within current file's column range
+  // (cross-template contamination: 8-col template saved → 3-col file loaded → index out of range)
+  if (effectiveSaved) {
+    const maxCol = firstRow.length;
+    if (saved.dateCol < 0 || saved.dateCol >= maxCol) mapping.dateCol = detected.dateCol;
+    if (saved.descCol < 0 || saved.descCol >= maxCol) mapping.descCol = detected.descCol;
+    if (saved.amountCol < 0 || saved.amountCol >= maxCol) mapping.amountCol = detected.amountCol;
+    if (typeof saved.debitCol === 'number' && (saved.debitCol < 0 || saved.debitCol >= maxCol)) mapping.debitCol = detected.debitCol;
+    if (typeof saved.creditCol === 'number' && (saved.creditCol < 0 || saved.creditCol >= maxCol)) mapping.creditCol = detected.creditCol;
+  }
+
+  // Build options: use header text if header row detected, otherwise "列N"
+  function buildOptions(sel) {
+    sel.innerHTML = '';
+    for (let i = 0; i < firstRow.length; i++) {
+      const label = hasHeader ? (firstRow[i] || `列${i+1}`) : `列${i+1}`;
+      sel.innerHTML += `<option value="${i}">${String(label).substring(0, 15)}</option>`;
+    }
+  }
+  buildOptions(dateSelect);
+  buildOptions(descSelect);
+  buildOptions(amountSelect);
+  if (debitSelect) buildOptions(debitSelect);
+  if (creditSelect) buildOptions(creditSelect);
+
+  dateSelect.value = mapping.dateCol;
+  descSelect.value = mapping.descCol;
+  amountSelect.value = mapping.amountCol;
+
+  // Restore sign flip from saved mapping (was missing before v2.21)
+  if (effectiveSaved && typeof effectiveSaved.signFlip === 'boolean') {
+    document.getElementById(`${source}-sign-flip`).checked = effectiveSaved.signFlip;
+  }
+
+  const dualCheckbox = document.getElementById(`${source}-dual-amount`);
+  const dualRow = document.getElementById(`${source}-dual-row`);
+  // Reset dual/signFlip to defaults before conditional activation
+  // (prevent toggle-on without toggle-off when switching between file types)
+  dualCheckbox.checked = false;
+  dualRow.classList.remove('show');
+  document.getElementById(`${source}-sign-flip`).parentElement.style.display = '';
+
+  // Dual amount: activate if current file has dual columns — always
+  // Structural detection is an objective fact, not a user preference.
+  // saved.dualAmount=false from a single-amount file must not suppress
+  // auto-enable for a file that clearly has 借方/贷方 columns.
+  if (dualDetected.debitCol >= 0 && dualDetected.creditCol >= 0 && dualDetected.debitCol !== dualDetected.creditCol) {
+    dualCheckbox.checked = true;
+    dualRow.classList.add('show');
+    document.getElementById(`${source}-sign-flip`).parentElement.style.display = 'none';
+    debitSelect.value = (effectiveSaved && effectiveSaved.debitCol >= 0) ? effectiveSaved.debitCol : dualDetected.debitCol;
+    creditSelect.value = (effectiveSaved && effectiveSaved.creditCol >= 0) ? effectiveSaved.creditCol : dualDetected.creditCol;
+  }
+
+  persistMapping(source, firstRow);
+}
+
+function saveMapping(source, mapping) {
+  try { localStorage.setItem(`recon_${source}`, JSON.stringify(mapping)); } catch(e) {}
+}
+
+function loadMapping(source) {
+  try {
+    const saved = localStorage.getItem(`recon_${source}`);
+    return saved ? JSON.parse(saved) : null;
+  } catch(e) { return null; }
+}
+
+function persistMapping(source, firstRow) {
+  const dateSelect = document.getElementById(`${source}-date-col`);
+  // Use raw row values (substring(0,30)) as template fingerprint, matching the
+  // comparison format in updateColumnSelects. Option text is truncated to 15 chars
+  // by buildOptions and would mismatch on long headers (>15 chars).
+  const headers = firstRow
+    ? firstRow.map(h => String(h || '').substring(0, 30))
+    : Array.from(dateSelect.options).map(opt => opt.textContent.substring(0, 30));
+  const mapping = {
+    dateCol: parseInt(dateSelect.value),
+    descCol: parseInt(document.getElementById(`${source}-desc-col`).value),
+    amountCol: parseInt(document.getElementById(`${source}-amount-col`).value),
+    dualAmount: document.getElementById(`${source}-dual-amount`).checked,
+    debitCol: parseInt(document.getElementById(`${source}-debit-col`).value) || 0,
+    creditCol: parseInt(document.getElementById(`${source}-credit-col`).value) || 0,
+    signFlip: document.getElementById(`${source}-sign-flip`).checked,
+    _h: headers  // header fingerprint for template matching
+  };
+  saveMapping(source, mapping);
+}
+
+// ============================================================
+// Matching Engine (unchanged core logic)
+// ============================================================
+
+function reconcile(bankRecords, acctRecords) {
+  const bankById = new Map(bankRecords.map(r => [r.id, r]));
+  const acctById = new Map(acctRecords.map(r => [r.id, r]));
+
+  function amtKey(amount) { return amount.toFixed(2); }
+  const bankByAmount = new Map();
+  const acctByAmount = new Map();
+  for (const r of bankRecords) {
+    const k = amtKey(r.amount);
+    if (!bankByAmount.has(k)) bankByAmount.set(k, []);
+    bankByAmount.get(k).push(r.id);
+  }
+  for (const r of acctRecords) {
+    const k = amtKey(r.amount);
+    if (!acctByAmount.has(k)) acctByAmount.set(k, []);
+    acctByAmount.get(k).push(r.id);
+  }
+
+  const matchedIds = { bank: new Set(), acct: new Set() };
+  const matchesL1 = [];
+
+  for (const [amount, bankIds] of bankByAmount) {
+    const acctIds = acctByAmount.get(amount);
+    if (!acctIds) continue;
+    if (bankIds.length === 1 && acctIds.length === 1) {
+      const bankRec = bankById.get(bankIds[0]);
+      const acctRec = acctById.get(acctIds[0]);
+      const span = dateDiff(bankRec.date, acctRec.date);
+      const confidence = span > 365 ? 'low' : 'high';
+      matchesL1.push({ bankId: bankIds[0], acctId: acctIds[0], level: 'L1', confidence, dateSpan: span });
+      matchedIds.bank.add(bankIds[0]);
+      matchedIds.acct.add(acctIds[0]);
+    }
+  }
+
+  const bankPool = bankRecords.filter(r => !matchedIds.bank.has(r.id));
+  const acctPool = acctRecords.filter(r => !matchedIds.acct.has(r.id));
+
+  const matchesL2 = [];
+  for (const bank of bankPool) {
+    const candidates = acctPool.filter(a =>
+      !matchedIds.acct.has(a.id) &&
+      Math.abs(a.amount - bank.amount) < 0.005 &&
+      dateDiff(a.date, bank.date) <= 1
+    );
+    if (candidates.length === 1) {
+      // Bidirectional check: is this acct also a valid L2 candidate for another bank?
+      const rivalBanks = bankPool.filter(b =>
+        b.id !== bank.id &&
+        !matchedIds.bank.has(b.id) &&
+        Math.abs(b.amount - candidates[0].amount) < 0.005 &&
+        dateDiff(b.date, candidates[0].date) <= 1
+      );
+      if (rivalBanks.length === 0) {
+        matchesL2.push({ bankId: bank.id, acctId: candidates[0].id, level: 'L2', confidence: 'medium' });
+        matchedIds.bank.add(bank.id);
+        matchedIds.acct.add(candidates[0].id);
+      }
+    }
+  }
+
+  const bankOnly = bankRecords.filter(r => !matchedIds.bank.has(r.id));
+  const acctOnly = acctRecords.filter(r => !matchedIds.acct.has(r.id));
+
+  const amountClose = [];
+  for (const bank of bankOnly) {
+    for (const acct of acctOnly) {
+      const diff = Math.abs(bank.amount - acct.amount);
+      if (diff >= 0.01 && diff <= 10) {
+        amountClose.push({ bankId: bank.id, acctId: acct.id, diff: Math.round(diff * 100) / 100 });
+      }
+    }
+  }
+
+  const allRemaining = [...bankOnly, ...acctOnly];
+  const amountGroups = new Map();
+  for (const r of allRemaining) {
+    const k = amtKey(r.amount);
+    if (!amountGroups.has(k)) amountGroups.set(k, []);
+    amountGroups.get(k).push(r);
+  }
+  const duplicateGroups = [];
+  for (const [amount, records] of amountGroups) {
+    if (records.length >= 2) {
+      const banks = records.filter(r => r.source === 'bank').map(r => r.id);
+      const accts = records.filter(r => r.source === 'acct').map(r => r.id);
+      if (banks.length > 0 && accts.length > 0) {
+        duplicateGroups.push({ amount: parseFloat(amount), bankIds: banks, acctIds: accts });
+      }
+    }
+  }
+
+  return {
+    matches: [...matchesL1, ...matchesL2],
+    bankOnly, acctOnly, amountClose, duplicateGroups,
+    bankById, acctById,
+    totalBank: bankRecords.length, totalAcct: acctRecords.length
+  };
+}
+
+// ============================================================
+// State
+// ============================================================
+
+const state = {
+  bankRecords: null, acctRecords: null,
+  bankRawRows: null, acctRawRows: null,
+  results: null
+};
+
+// ============================================================
+// Rendering
+// ============================================================
+
+function renderStats(results) {
+  const lowConfCount = results.matches.filter(m => m.confidence === 'low').length;
+  document.getElementById('stats-panel').innerHTML = `
+    <div class="stat-card total">
+      <div class="stat-value">${results.totalBank + results.totalAcct}</div>
+      <div class="stat-label">总计笔数</div>
+    </div>
+    <div class="stat-card matched">
+      <div class="stat-value">${results.matches.length}</div>
+      <div class="stat-label">已匹配对</div>
+    </div>
+    <div class="stat-card bank-only">
+      <div class="stat-value">${results.bankOnly.length}</div>
+      <div class="stat-label">仅银行</div>
+    </div>
+    <div class="stat-card acct-only">
+      <div class="stat-value">${results.acctOnly.length}</div>
+      <div class="stat-label">仅账务</div>
+    </div>
+    ${lowConfCount > 0 ? `<div class="stat-card" style="border-left-color:var(--red);background:var(--red-bg);">
+      <div class="stat-value" style="color:var(--red);">&#x26a0; ${lowConfCount}</div>
+      <div class="stat-label" style="color:var(--red);">日期跨年待核实</div>
+    </div>` : ''}`;
+}
+
+function renderResults(results) {
+  const container = document.getElementById('results-list');
+  let html = '';
+
+  // Bank-only
+  if (results.bankOnly.length > 0) {
+    const tagHints = new Map();
+    for (const c of results.amountClose) {
+      if (!tagHints.has(c.bankId)) tagHints.set(c.bankId, new Set());
+      tagHints.get(c.bankId).add('close');
+    }
+    for (const dg of results.duplicateGroups) {
+      for (const id of dg.bankIds) {
+        if (!tagHints.has(id)) tagHints.set(id, new Set());
+        tagHints.get(id).add('duplicate');
+      }
+    }
+    html += `<div class="result-group bank-only open">
+      <div class="result-group-header" role="button" tabindex="0" aria-expanded="true" onclick="toggleGroup(this)">
+        <span><span class="badge">仅银行流水</span> ${results.bankOnly.length} 笔</span>
+        <span class="arrow">&#x25b2;</span>
+      </div>
+      <div class="result-group-body">
+        <table class="result-table">
+          <thead><tr><th>日期</th><th>摘要</th><th class="amount-cell">金额</th><th>候选提示</th></tr></thead>
+          <tbody>${results.bankOnly.map(r => {
+            const tags = [];
+            const hints = tagHints.get(r.id);
+            if (hints && hints.has('close')) tags.push('<span class="tag close">&#x1f50d; 金额相近</span>');
+            if (hints && hints.has('duplicate')) tags.push('<span class="tag duplicate">&#x26a1; 重复金额</span>');
+            if (!tags.length) tags.push('<span style="color:var(--text-muted);font-size:0.72rem">—</span>');
+            return `<tr><td>${r.date}</td><td>${escHtml(r.desc)}</td><td class="amount-cell">${fmtAmt(r.amount)}</td><td>${tags.join('')}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  // Acct-only
+  if (results.acctOnly.length > 0) {
+    const tagHints = new Map();
+    for (const c of results.amountClose) {
+      if (!tagHints.has(c.acctId)) tagHints.set(c.acctId, new Set());
+      tagHints.get(c.acctId).add('close');
+    }
+    for (const dg of results.duplicateGroups) {
+      for (const id of dg.acctIds) {
+        if (!tagHints.has(id)) tagHints.set(id, new Set());
+        tagHints.get(id).add('duplicate');
+      }
+    }
+    html += `<div class="result-group acct-only open">
+      <div class="result-group-header" role="button" tabindex="0" aria-expanded="true" onclick="toggleGroup(this)">
+        <span><span class="badge">仅账务明细</span> ${results.acctOnly.length} 笔</span>
+        <span class="arrow">&#x25b2;</span>
+      </div>
+      <div class="result-group-body">
+        <table class="result-table">
+          <thead><tr><th>日期</th><th>摘要</th><th class="amount-cell">金额</th><th>候选提示</th></tr></thead>
+          <tbody>${results.acctOnly.map(r => {
+            const tags = [];
+            const hints = tagHints.get(r.id);
+            if (hints && hints.has('close')) tags.push('<span class="tag close">&#x1f50d; 金额相近</span>');
+            if (hints && hints.has('duplicate')) tags.push('<span class="tag duplicate">&#x26a1; 重复金额</span>');
+            if (!tags.length) tags.push('<span style="color:var(--text-muted);font-size:0.72rem">—</span>');
+            return `<tr><td>${r.date}</td><td>${escHtml(r.desc)}</td><td class="amount-cell">${fmtAmt(r.amount)}</td><td>${tags.join('')}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  // Candidate hints
+  const hasClose = results.amountClose.length > 0;
+  const hasDup = results.duplicateGroups.length > 0;
+  if (hasClose || hasDup) {
+    html += `<div class="result-group candidates open">
+      <div class="result-group-header" role="button" tabindex="0" aria-expanded="true" onclick="toggleGroup(this)">
+        <span><span class="badge">候选提示</span> 帮助定位，不改变上方分类</span>
+        <span class="arrow">&#x25b2;</span>
+      </div>
+      <div class="result-group-body">`;
+
+    if (hasClose) {
+      html += `<div class="candidate-hint">
+        <strong>&#x1f50d; 金额相近待确认（${results.amountClose.length} 组）</strong>
+        <p style="color:var(--text-muted);font-size:0.78rem;margin-top:4px;">金额相差不超过 10 元的未匹配记录，可能为同一笔交易</p>`;
+      for (const c of results.amountClose) {
+        const bank = results.bankById.get(c.bankId);
+        const acct = results.acctById.get(c.acctId);
+        html += `<div class="pair">
+          <span class="item">${bank.date} ${escHtml(bank.desc)} <strong>${fmtAmt(bank.amount)}</strong></span>
+          <span class="vs">vs</span>
+          <span class="item">${acct.date} ${escHtml(acct.desc)} <strong>${fmtAmt(acct.amount)}</strong></span>
+          <span style="font-size:0.75rem;color:var(--text-muted)">差 ${c.diff.toFixed(2)}</span>
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (hasDup) {
+      html += `<div class="candidate-hint">
+        <strong>&#x26a1; 重复金额需人工判断（${results.duplicateGroups.length} 组）</strong>
+        <p style="color:var(--text-muted);font-size:0.78rem;margin-top:4px;">多笔记录金额相同，系统无法自动判定配对关系</p>`;
+      for (const dg of results.duplicateGroups) {
+        const banks = dg.bankIds.map(id => results.bankById.get(id)).filter(Boolean);
+        const accts = dg.acctIds.map(id => results.acctById.get(id)).filter(Boolean);
+        html += `<div style="margin-top:8px;"><strong>金额 ${fmtAmt(dg.amount)}</strong>（${banks.length + accts.length} 笔）</div>
+        <div class="pair">
+          ${banks.map(b => `<span class="item">银行 ${b.date} ${escHtml(b.desc)}</span>`).join('')}
+          ${accts.map(a => `<span class="item">账务 ${a.date} ${escHtml(a.desc)}</span>`).join('')}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  // Matched
+  if (results.matches.length > 0) {
+    html += `<div class="result-group matched">
+      <div class="result-group-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleGroup(this)">
+        <span><span class="badge">已匹配</span> ${results.matches.length} 对</span>
+        <span class="arrow">&#x25b2;</span>
+      </div>
+      <div class="result-group-body">
+        <table class="result-table">
+          <thead><tr><th>日期</th><th>摘要</th><th class="amount-cell">金额</th><th>匹配方式</th></tr></thead>
+          <tbody>${results.matches.map(m => {
+            const bank = results.bankById.get(m.bankId);
+            const acct = results.acctById.get(m.acctId);
+            let lbl;
+            if (m.confidence === 'low') {
+              lbl = `<span class="diff-match" style="background:var(--red-bg);color:var(--red)">&#x26a0; 日期跨年(${m.dateSpan > 0 ? Math.round(m.dateSpan) : '?'}天)</span>`;
+            } else if (m.level === 'L1') {
+              lbl = '<span class="diff-match">&#x2713; 金额精确</span>';
+            } else {
+              lbl = '<span class="diff-match" style="background:var(--amber-bg);color:var(--amber)">&#x26a1; 日期容差</span>';
+            }
+            return `<tr><td>${bank.date} / ${acct.date}</td>
+              <td>${escHtml(bank.desc)}</td>
+              <td class="amount-cell">${fmtAmt(bank.amount)}</td><td>${lbl}</td></tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  container.innerHTML = html;
+}
+
+function toggleGroup(header) {
+  header.closest('.result-group').classList.toggle('open');
+  const expanded = header.closest('.result-group').classList.contains('open');
+  header.setAttribute('aria-expanded', expanded);
+}
+
+// ============================================================
+// Export
+// ============================================================
+
+function buildExportData(results) {
+  // Build candidate hint index for unmatched records (multi-valued)
+  const bankHints = new Map();
+  const acctHints = new Map();
+  for (const c of results.amountClose) {
+    if (!bankHints.has(c.bankId)) bankHints.set(c.bankId, []);
+    bankHints.get(c.bankId).push(`金额相近(差${c.diff.toFixed(2)})`);
+    if (!acctHints.has(c.acctId)) acctHints.set(c.acctId, []);
+    acctHints.get(c.acctId).push(`金额相近(差${c.diff.toFixed(2)})`);
+  }
+  for (const dg of results.duplicateGroups) {
+    for (const id of dg.bankIds) {
+      if (!bankHints.has(id)) bankHints.set(id, []);
+      bankHints.get(id).push('重复金额');
+    }
+    for (const id of dg.acctIds) {
+      if (!acctHints.has(id)) acctHints.set(id, []);
+      acctHints.get(id).push('重复金额');
+    }
+  }
+
+  const rows = [['分类', '来源', '日期', '摘要', '金额', '匹配状态', '候选提示']];
+  for (const r of results.bankOnly) {
+    rows.push(['仅银行', '银行流水', r.date, r.desc, r.amount.toFixed(2), '未匹配', (bankHints.get(r.id) || []).join('; ')]);
+  }
+  for (const r of results.acctOnly) {
+    rows.push(['仅账务', '账务明细', r.date, r.desc, r.amount.toFixed(2), '未匹配', (acctHints.get(r.id) || []).join('; ')]);
+  }
+  for (const m of results.matches) {
+    const bank = results.bankById.get(m.bankId);
+    const acct = results.acctById.get(m.acctId);
+    rows.push(['已匹配', '银行流水', bank.date, bank.desc, bank.amount.toFixed(2), m.level, '']);
+    rows.push(['已匹配', '账务明细', acct.date, acct.desc, acct.amount.toFixed(2), m.level, '']);
+  }
+  // Append candidate summary section
+  if (results.amountClose.length > 0) {
+    rows.push([]);
+    rows.push(['候选提示：金额相近', '', '', '', '', '', '']);
+    for (const c of results.amountClose) {
+      const bank = results.bankById.get(c.bankId);
+      const acct = results.acctById.get(c.acctId);
+      rows.push(['', '', bank.date, bank.desc, bank.amount.toFixed(2), 'vs ' + acct.desc + '(' + acct.amount.toFixed(2) + ')', '差 ' + c.diff.toFixed(2)]);
+    }
+  }
+  if (results.duplicateGroups.length > 0) {
+    rows.push([]);
+    rows.push(['候选提示：重复金额', '', '', '', '', '', '']);
+    for (const dg of results.duplicateGroups) {
+      rows.push(['', '', '', '金额 ' + dg.amount.toFixed(2), dg.bankIds.length + '银行 + ' + dg.acctIds.length + '账务', '', '需人工判断']);
+    }
+  }
+  return rows;
+}
+
+function exportTSV(results) {
+  const data = buildExportData(results);
+  const tsv = data.map(row => row.join('\t')).join('\n');
+  navigator.clipboard.writeText(tsv).then(() => {
+    toast('已复制到剪贴板，可粘贴到 Excel');
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = tsv;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('已复制到剪贴板');
+  });
+}
+
+function exportCSV(results) {
+  const data = buildExportData(results);
+  const csv = data.map(row => row.map(f => {
+    const s = String(f);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+  }).join(',')).join('\r\n');
+  const blob = new Blob(['\uFEFF' + csv], {type: 'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = '对账差异清单.csv'; a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV 已下载');
+  window.Feedback && window.Feedback.trackEvent({ event: 'export_csv', metadata: { matchCount: results.matched.length, diffCount: results.diffs.length } });
+}
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function fmtAmt(n) {
+  const abs = Math.abs(n);
+  const formatted = abs.toLocaleString('zh-CN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+  return n < 0 ? '-' + formatted : formatted;
+}
+
+function escHtml(s) {
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timeout);
+  el._timeout = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function showWarning(summary, errors) {
+  const banner = document.getElementById('warning-banner');
+  document.getElementById('warning-summary').textContent = summary;
+  const list = document.getElementById('warning-list');
+  if (errors && errors.length > 0) {
+    list.innerHTML = errors.map(e => `<li>第${e.row}行 ${e.field}: "${String(e.value).substring(0, 30)}"</li>`).join('');
+    list.style.display = 'block';
+  } else {
+    list.style.display = 'none';
+  }
+  banner.classList.add('show');
+}
+
+// ============================================================
+// Event Handlers
+// ============================================================
+
+function handleFileUpload(source, file) {
+  const ext = file.name.split('.').pop().toLowerCase();
+  if (ext === 'csv' || ext === 'txt') {
+    handleCSVUpload(source, file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    handleXlsxUpload(source, file);
+  } else {
+    toast('不支持的文件格式，请使用 CSV 或 Excel 文件');
+    return;
+  }
+  window.Feedback && window.Feedback.trackEvent({ event: 'file_upload', metadata: { source: source, type: ext } });
+}
+
+function processRows(source, rows) {
+  if (rows.length === 0) return;
+  // Strip header row if detected
+  let dataRows = rows;
+  if (isHeaderRow(rows)) {
+    dataRows = rows.slice(1);
+  }
+  // Pass original rows (with header) so detectColumns/detectDualColumns
+  // can do keyword matching on column names; state stores stripped data only
+  updateColumnSelects(source, rows);
+  if (source === 'bank') { state.bankRawRows = dataRows; }
+  else { state.acctRawRows = dataRows; }
+  document.getElementById(`${source}-count`).textContent = `已加载 ${dataRows.length} 行`;
+}
+
+function handlePaste(source, text) {
+  text = text.replace(/^\uFEFF/, '');
+  processRows(source, parsePaste(text));
+  document.getElementById(`${source}-file-info`).classList.remove('show');
+}
+
+function handleCSVUpload(source, file) {
+  const reader = new FileReader();
+  reader.onload = function() {
+    const arr = new Uint8Array(reader.result);
+    let text = new TextDecoder('utf-8').decode(arr);
+    if (text.includes('\uFFFD')) {
+      try { text = new TextDecoder('gbk').decode(arr); }
+      catch(e) { text = new TextDecoder('gb2312').decode(arr); }
+    }
+    processRows(source, parseCSV(text));
+    const rowCount = source === 'bank' ? state.bankRawRows?.length : state.acctRawRows?.length;
+    document.getElementById(`${source}-file-info`).textContent = `已加载: ${file.name} (${rowCount} 行)`;
+    document.getElementById(`${source}-file-info`).classList.add('show');
+    // Update upload area visual state
+    const uploadArea = document.getElementById(`${source}-file-upload`);
+    uploadArea.classList.add('has-file');
+    uploadArea.querySelector('.upload-icon').textContent = '\u2705';
+    uploadArea.querySelector('.upload-text').textContent = file.name;
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function handleXlsxUpload(source, file) {
+  if (typeof XLSX === 'undefined') {
+    document.getElementById(`${source}-xlsx-fallback`).classList.add('show');
+    return;
+  }
+  document.getElementById(`${source}-xlsx-fallback`).classList.remove('show');
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const wb = XLSX.read(new Uint8Array(e.target.result), {type: 'array'});
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const rows = XLSX.utils.sheet_to_json(sheet, {header: 1, defval: ''});
+      processRows(source, rows);
+      const rowCount = source === 'bank' ? state.bankRawRows?.length : state.acctRawRows?.length;
+      document.getElementById(`${source}-file-info`).textContent = `已加载: ${file.name} (${rowCount} 行)`;
+      document.getElementById(`${source}-file-info`).classList.add('show');
+      // Update upload area visual state
+      const uploadArea = document.getElementById(`${source}-file-upload`);
+      uploadArea.classList.add('has-file');
+      uploadArea.querySelector('.upload-icon').textContent = '\u2705';
+      uploadArea.querySelector('.upload-text').textContent = file.name;
+    } catch(err) {
+      toast(`${file.name} 解析失败: ${err.message}`);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function getNormalizedRecords(source) {
+  const periodYear = parseInt(document.getElementById('period-year').value);
+  const periodMonth = parseInt(document.getElementById('period-month').value);
+  const rows = source === 'bank' ? state.bankRawRows : state.acctRawRows;
+  if (!rows || rows.length === 0) return { records: [], errors: [] };
+  const dualMode = document.getElementById(`${source}-dual-amount`).checked;
+  const mapping = {
+    dateCol: parseInt(document.getElementById(`${source}-date-col`).value),
+    descCol: parseInt(document.getElementById(`${source}-desc-col`).value),
+    amountCol: parseInt(document.getElementById(`${source}-amount-col`).value),
+    dualAmount: dualMode,
+    debitCol: dualMode ? parseInt(document.getElementById(`${source}-debit-col`).value) : -1,
+    creditCol: dualMode ? parseInt(document.getElementById(`${source}-credit-col`).value) : -1
+  };
+  const signFlip = !dualMode && document.getElementById(`${source}-sign-flip`).checked;
+  return normalizeRecords(rows, mapping, periodYear, periodMonth, signFlip, source);
+}
+
+function doReconcile() {
+  document.getElementById('warning-banner').classList.remove('show');
+  const bankResult = getNormalizedRecords('bank');
+  const acctResult = getNormalizedRecords('acct');
+
+  // Collect warnings but proceed with valid records
+  let warnings = [];
+  if (bankResult.errors.length > 0) {
+    warnings.push(`银行流水: ${bankResult.errors.length} 行无法解析`);
+  }
+  if (acctResult.errors.length > 0) {
+    warnings.push(`账务明细: ${acctResult.errors.length} 行无法解析`);
+  }
+
+  if (bankResult.records.length === 0 || acctResult.records.length === 0) {
+    if (warnings.length > 0) {
+      showWarning(`没有可解析的有效记录。${warnings.join('；')}`, [...bankResult.errors, ...acctResult.errors]);
+    } else {
+      toast('请先加载银行流水和账务明细');
+    }
+    return;
+  }
+
+  if (warnings.length > 0) {
+    showWarning(`${warnings.join('；')}。以下为 ${bankResult.records.length} + ${acctResult.records.length} 条有效记录的对账结果。`, [...bankResult.errors, ...acctResult.errors]);
+  }
+
+  state.bankRecords = bankResult.records;
+  state.acctRecords = acctResult.records;
+  state.results = reconcile(state.bankRecords, state.acctRecords);
+
+  document.getElementById('empty-state').hidden = true;
+  document.getElementById('results-area').hidden = false;
+  document.getElementById('export-bar').hidden = false;
+  renderStats(state.results);
+  renderResults(state.results);
+  document.getElementById('results-area').scrollIntoView({behavior: 'smooth', block: 'start'});
+
+  window.Feedback && window.Feedback.trackEvent({ event: 'start_reconciliation', metadata: { bankRows: state.bankRecords.length, ledgerRows: state.acctRecords.length } });
+}
+
+function doReset() {
+  state.bankRecords = null; state.acctRecords = null;
+  state.bankRawRows = null; state.acctRawRows = null;
+  state.results = null;
+  document.getElementById('bank-paste').value = '';
+  document.getElementById('acct-paste').value = '';
+  document.getElementById('bank-file-info').classList.remove('show');
+  document.getElementById('acct-file-info').classList.remove('show');
+  document.getElementById('bank-count').textContent = '';
+  document.getElementById('acct-count').textContent = '';
+  document.getElementById('bank-xlsx-fallback').classList.remove('show');
+  document.getElementById('acct-xlsx-fallback').classList.remove('show');
+  document.getElementById('warning-banner').classList.remove('show');
+  document.getElementById('results-area').hidden = true;
+  document.getElementById('export-bar').hidden = true;
+  document.getElementById('empty-state').hidden = false;
+  document.getElementById('results-list').innerHTML = '';
+  document.getElementById('stats-panel').innerHTML = '';
+  document.getElementById('bank-mapping-hint').hidden = true;
+  document.getElementById('acct-mapping-hint').hidden = true;
+  // Reset upload area visual state
+  ['bank', 'acct'].forEach(source => {
+    const area = document.getElementById(`${source}-file-upload`);
+    area.classList.remove('has-file');
+    area.querySelector('.upload-icon').textContent = '\ud83d\udcc1';
+    area.querySelector('.upload-text').textContent = '点击选择文件，或拖拽 CSV/Excel 文件到此处';
+  });
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+
+function initPeriodSelect() {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const yearSelect = document.getElementById('period-year');
+  const monthSelect = document.getElementById('period-month');
+
+  // Year: current-3 to current+1
+  for (let y = currentYear - 3; y <= currentYear + 1; y++) {
+    yearSelect.innerHTML += `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}</option>`;
+  }
+
+  // Month: 1-12
+  for (let m = 1; m <= 12; m++) {
+    monthSelect.innerHTML += `<option value="${m}" ${m === now.getMonth() + 1 ? 'selected' : ''}>${m}</option>`;
+  }
+
+  function updateHint() {
+    const y = parseInt(yearSelect.value);
+    const m = parseInt(monthSelect.value);
+    document.getElementById('period-hint').textContent = `当前选择: ${y}年${m}月`;
+  }
+  yearSelect.addEventListener('change', updateHint);
+  monthSelect.addEventListener('change', updateHint);
+  updateHint();
+}
+
+function init() {
+  initPeriodSelect();
+
+  // Paste areas
+  ['bank', 'acct'].forEach(source => {
+    const pasteArea = document.getElementById(`${source}-paste`);
+    pasteArea.addEventListener('input', () => {
+      if (pasteArea.value.trim()) handlePaste(source, pasteArea.value);
+    });
+
+    // Unified file upload: label's for attr handles click natively
+    // Drag-and-drop + change handlers with drag counter to prevent flicker
+    const uploadArea = document.getElementById(`${source}-file-upload`);
+    const fileInput = document.getElementById(`${source}-file-input`);
+    let dragCounter = 0;
+
+    fileInput.addEventListener('change', function() {
+      if (this.files[0]) handleFileUpload(source, this.files[0]);
+    });
+
+    uploadArea.addEventListener('dragenter', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      dragCounter++;
+      this.classList.add('drag-over');
+    });
+    uploadArea.addEventListener('dragover', function(e) {
+      e.preventDefault(); e.stopPropagation();
+    });
+    uploadArea.addEventListener('dragleave', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      dragCounter--;
+      if (dragCounter === 0) this.classList.remove('drag-over');
+    });
+    uploadArea.addEventListener('drop', function(e) {
+      e.preventDefault(); e.stopPropagation();
+      dragCounter = 0;
+      this.classList.remove('drag-over');
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+      fileInput.files = e.dataTransfer.files;
+      fileInput.dispatchEvent(new Event('change'));
+    });
+
+    // Column mapping change → persist immediately
+    ['date-col', 'desc-col', 'amount-col', 'debit-col', 'credit-col'].forEach(suffix => {
+      const el = document.getElementById(`${source}-${suffix}`);
+      if (el) el.addEventListener('change', () => persistMapping(source));
+    });
+
+    // Sign flip change → persist
+    const signFlip = document.getElementById(`${source}-sign-flip`);
+    if (signFlip) signFlip.addEventListener('change', () => persistMapping(source));
+
+    // Dual amount toggle
+    const dualCheck = document.getElementById(`${source}-dual-amount`);
+    const dualRow = document.getElementById(`${source}-dual-row`);
+    if (dualCheck && dualRow) {
+      dualCheck.addEventListener('change', () => {
+        dualRow.classList.toggle('show', dualCheck.checked);
+        document.getElementById(`${source}-sign-flip`).parentElement.style.display = dualCheck.checked ? 'none' : '';
+        persistMapping(source);
+      });
+    }
+
+    // Restore saved mapping state on load
+    const saved = loadMapping(source);
+    if (saved) {
+      // Apply after a tick when selects are populated (they'll be empty before data loads)
+      // The mapping is reapplied in updateColumnSelects when data arrives
+    }
+  });
+
+  // Action buttons
+  document.getElementById('btn-reconcile').addEventListener('click', doReconcile);
+  document.getElementById('btn-reset').addEventListener('click', doReset);
+  document.getElementById('btn-export-tsv').addEventListener('click', () => {
+    if (state.results) exportTSV(state.results);
+  });
+  document.getElementById('btn-export-csv').addEventListener('click', () => {
+    if (state.results) exportCSV(state.results);
+  });
+
+  // Keyboard shortcut
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      doReconcile();
+    }
+  });
+
+  // Warning banner click to dismiss
+  document.getElementById('warning-banner').addEventListener('click', function() {
+    this.classList.remove('show');
+  });
+
+  // Keyboard: delegate Enter/Space on result-group-header (accessibility)
+  document.getElementById('results-list').addEventListener('keydown', function(e) {
+    const header = e.target.closest('.result-group-header');
+    if (header && (e.key === 'Enter' || e.key === ' ')) {
+      e.preventDefault();
+      toggleGroup(header);
+    }
+  });
+
+  // xlsx CDN check
+  window.addEventListener('load', function() {
+    if (typeof XLSX === 'undefined') {
+      ['bank', 'acct'].forEach(s => {
+        document.getElementById(`${s}-xlsx-fallback`).classList.add('show');
+      });
+    }
+  });
+
+  // 反馈闭环初始化（部署时替换 Supabase 凭据）
+  if (window.Feedback) {
+    window.Feedback.initFeedback({
+      project: 'bank-rec',
+      supabaseUrl: 'https://oiwvqsgkzzhexsfslcoa.supabase.co',
+      supabaseKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pd3Zxc2drenpoZXhzZnNsY29hIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMjE4MjEsImV4cCI6MjA5NTc5NzgyMX0.QEiB0gzqslfCI8xqyhijB6R0kmmgtCS_cBZcdMtvWj0'
+    });
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="feedback.js"></script>
+</body>
+</html>
